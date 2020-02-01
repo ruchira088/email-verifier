@@ -1,0 +1,15 @@
+version: "3"
+
+services:
+
+  email-verifier:
+    build: .
+    ports:
+      - 5005:5005
+    volumes:
+      - "~/.sbt:/root/.sbt"
+      - "~/.coursier:/root/.coursier"
+      - ".:/opt/email-verifier"
+      - "/opt/email-verifier/target"
+      - "/opt/email-verifier/project/target"
+      - "/root/.sbt/1.0/plugins"

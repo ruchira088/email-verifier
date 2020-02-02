@@ -6,7 +6,7 @@ object Dependencies
 
   lazy val kindProjector = "org.typelevel" %% "kind-projector" % "0.11.0" cross CrossVersion.full
 
-  lazy val catsEffect = "org.typelevel" %% "cats-effect" % "2.0.0"
+  lazy val catsEffect = "org.typelevel" %% "cats-effect" % "2.1.0"
 
   lazy val pureConfig = "com.github.pureconfig" %% "pureconfig" % "0.12.2"
 

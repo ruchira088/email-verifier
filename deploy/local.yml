@@ -1,0 +1,33 @@
+---
+- import_playbook: secrets.yml
+
+- hosts: localhost
+  connection: local
+
+  tasks:
+    - name: Delete the existing secrets file
+      file:
+        path: ../set-secrets.sh
+        state: absent
+
+    - name: Create new secrets file
+      copy:
+        dest: ../set-secrets.sh
+        content: |
+          #!/usr/bin/env bash
+
+          echo "Setting secrets and config values as environment variables"
+
+    - name: Write secrets to the secrets file
+      lineinfile:
+        dest: ../set-secrets.sh
+        line: |
+          # secret
+          export {{ item.key }}={{ item.value }}
+      with_items: "{{ secrets | dict2items }}"
+
+    - name: Write success message to the secrets file
+      lineinfile:
+        dest: ../set-secrets.sh
+        line: |
+          echo "Successfully set secrets and config values"

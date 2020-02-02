@@ -17,7 +17,15 @@ lazy val root =
     )
 
 lazy val rootDependencies =
-  Seq(catsEffect, pureConfig, sendgrid, googleApiClient, googleOauthClientJetty, googleApiServicesGmail, shapeless)
+  Seq(
+    catsEffect,
+    pureConfig,
+    sendgrid,
+    googleApiClient,
+    googleOauthClientJetty,
+    googleApiServicesGmail,
+    shapeless
+  )
 
 lazy val rootTestDependencies =
   Seq(scalaTest, pegdown)

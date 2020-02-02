@@ -2,7 +2,7 @@ import Dependencies._
 
 lazy val root =
   (project in file("."))
-    .enablePlugins(BuildInfoPlugin, JavaAppPackaging)
+    .enablePlugins(BuildInfoPlugin, JavaAppPackaging, SbtTwirl)
     .settings(
       name := "email-verifier",
       organization := "com.ruchij",
@@ -24,7 +24,9 @@ lazy val rootDependencies =
     googleApiClient,
     googleOauthClientJetty,
     googleApiServicesGmail,
-    shapeless
+    shapeless,
+    jodaTime,
+    faker
   )
 
 lazy val rootTestDependencies =

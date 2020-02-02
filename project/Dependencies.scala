@@ -20,6 +20,10 @@ object Dependencies
 
   lazy val shapeless =  "com.chuusai" %% "shapeless" % "2.3.3"
 
+  lazy val jodaTime = "joda-time" % "joda-time" % "2.10.5"
+
+  lazy val faker = "com.github.javafaker" % "javafaker" % "1.0.1"
+
   lazy val scalaTest = "org.scalatest" %% "scalatest" % "3.1.0"
 
   lazy val pegdown = "org.pegdown" % "pegdown" % "1.6.0"

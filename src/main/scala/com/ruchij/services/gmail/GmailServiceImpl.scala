@@ -18,13 +18,13 @@ import com.ruchij.config.GmailConfiguration
 import com.ruchij.services.email.models.Email
 import com.ruchij.services.email.models.Email.EmailAddress
 import com.ruchij.services.gmail.GmailServiceImpl.AUTHENTICATED_USER
-import com.ruchij.services.gmail.models.FetchedEmails
+import com.ruchij.services.gmail.models.{GmailMessage, GmailMessagesResult}
 
 import scala.jdk.CollectionConverters._
 
 class GmailServiceImpl[F[_]: Sync: ContextShift](gmail: Gmail, blocker: Blocker) extends GmailService[F] {
 
-  override def fetchMessages(from: EmailAddress, pageToken: Option[String]): F[FetchedEmails] =
+  override def fetchMessages(from: EmailAddress, pageToken: Option[String]): F[GmailMessagesResult] =
     blocker
       .delay {
         pageToken.fold(
@@ -69,12 +69,12 @@ class GmailServiceImpl[F[_]: Sync: ContextShift](gmail: Gmail, blocker: Blocker)
                       new String(Base64.getDecoder.decode(data))
                     }
                     .getOrElse("")
-                } yield Email(Email.lift(to), Email.lift(from), subject, body)
+                } yield GmailMessage(message.getId, Email(Email.lift(to), Email.lift(from), subject, body), headers)
               }
           }
           .map { messages =>
-            FetchedEmails(
-              messages.collect { case Some(email: Email) => email },
+            GmailMessagesResult(
+              messages.collect { case Some(gmail: GmailMessage) => gmail },
               Option(listMessagesResponse.getNextPageToken)
             )
           }
@@ -93,12 +93,10 @@ object GmailServiceImpl {
     for {
       httpTransport <- Sync[F].delay(GoogleNetHttpTransport.newTrustedTransport())
 
-      _ <- Sync[F].delay(gmailConfiguration.credentials)
-
       clientSecrets <- Sync[F].delay {
         GoogleClientSecrets.load(
           jacksonFactory,
-          new InputStreamReader(new ByteArrayInputStream(gmailConfiguration.credentials.getBytes))
+          new InputStreamReader(new ByteArrayInputStream(StringContext.processEscapes(gmailConfiguration.credentials).getBytes))
         )
       }
 

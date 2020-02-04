@@ -3,14 +3,13 @@ package com.ruchij
 import java.util.concurrent.Executors
 
 import cats.effect.{Blocker, ExitCode, IO, IOApp}
-import com.github.javafaker.Faker
-import com.ruchij.config.GmailConfiguration
-import com.ruchij.lambda.SendGridHandler
-import com.ruchij.services.email.models.Email
-import com.ruchij.services.gmail.GmailServiceImpl
-import com.ruchij.services.joke.JokeService
+import com.ruchij.lambda.{GmailVerifierHandler, SendGridHandler}
 import com.ruchij.types.FunctionKTypes.fromThrowableEither
+import fs2.Stream
 import pureconfig.ConfigSource
+
+import scala.concurrent.duration._
+import scala.language.postfixOps
 
 object App extends IOApp {
 
@@ -21,18 +20,20 @@ object App extends IOApp {
           for {
             configObjectSource <- IO.delay(ConfigSource.defaultApplication)
 
-//            sendGridResponse <-
-//              SendGridHandler.handle(ioBlocker, configObjectSource, new JokeService[IO](Faker.instance()))
-//
-//            _ <- IO.delay(println(sendGridResponse.getStatusCode))
+            sendGridResult <- SendGridHandler.create[IO](configObjectSource, ioBlocker)
+            _ <- IO.delay(println(sendGridResult))
 
-            gmailConfiguration <- GmailConfiguration.load[IO](configObjectSource)
+            _ <-
+              Stream.range[IO](20, 0, -5)
+                .evalMap(count => IO.delay(println(s"$count seconds to go...")))
+                .evalMap(_ => IO.sleep(5 second))
+                .compile
+                .drain
 
-            gmailService <- GmailServiceImpl.create[IO](gmailConfiguration, ioBlocker)
+            _ <- IO.delay(println("Waiting COMPLETED"))
 
-            response <- gmailService.fetchMessages(gmailConfiguration.sender, None)
-
-            _ <- IO.delay(println(response))
+            verificationResult <- GmailVerifierHandler.create[IO](configObjectSource, ioBlocker)
+            _ <- IO.delay(println(verificationResult))
           }
           yield ExitCode.Success
       }

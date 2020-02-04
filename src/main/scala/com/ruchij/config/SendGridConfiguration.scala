@@ -4,7 +4,7 @@ import cats.effect.Sync
 import cats.~>
 import com.ruchij.services.email.models.Email.EmailAddress
 import com.ruchij.types.ConfigReaderTypes.emailConfigReader
-import pureconfig.{ConfigObjectSource, ConfigReader}
+import pureconfig.ConfigObjectSource
 import pureconfig.error.ConfigReaderException
 import pureconfig.generic.auto._
 

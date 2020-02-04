@@ -6,6 +6,8 @@ object Dependencies
 
   lazy val kindProjector = "org.typelevel" %% "kind-projector" % "0.11.0" cross CrossVersion.full
 
+  lazy val betterMonadicFor = "com.olegpy" %% "better-monadic-for" % "0.3.1"
+
   lazy val catsEffect = "org.typelevel" %% "cats-effect" % "2.1.0"
 
   lazy val pureConfig = "com.github.pureconfig" %% "pureconfig" % "0.12.2"
@@ -23,6 +25,8 @@ object Dependencies
   lazy val jodaTime = "joda-time" % "joda-time" % "2.10.5"
 
   lazy val faker = "com.github.javafaker" % "javafaker" % "1.0.1"
+
+  lazy val fs2 = "co.fs2" %% "fs2-core" % "2.2.1"
 
   lazy val scalaTest = "org.scalatest" %% "scalatest" % "3.1.0"
 

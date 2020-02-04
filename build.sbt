@@ -13,7 +13,8 @@ lazy val root =
       buildInfoPackage := "com.eed3si9n.ruchij",
       topLevelDirectory := None,
       scalacOptions ++= Seq("-Xlint", "-feature"),
-      addCompilerPlugin(kindProjector)
+      addCompilerPlugin(kindProjector),
+      addCompilerPlugin(betterMonadicFor)
     )
 
 lazy val rootDependencies =
@@ -26,7 +27,8 @@ lazy val rootDependencies =
     googleApiServicesGmail,
     shapeless,
     jodaTime,
-    faker
+    faker,
+    fs2
   )
 
 lazy val rootTestDependencies =

@@ -1,43 +1,51 @@
 package com.ruchij.lambda
 
-import java.util.concurrent.TimeUnit
-
 import cats.effect.{Blocker, Clock, ContextShift, Sync}
 import cats.implicits._
-import cats.~>
-import com.ruchij.config.SendGridConfiguration
-import com.ruchij.services.email.SendGridEmailService
+import cats.{Monad, ~>}
+import com.github.javafaker.Faker
+import com.ruchij.config.{SendGridConfiguration, VerificationConfiguration}
 import com.ruchij.services.email.models.Email
+import com.ruchij.services.email.models.Email.EmailAddress
+import com.ruchij.services.email.{EmailService, SendGridEmailService}
 import com.ruchij.services.joke.JokeService
-import com.sendgrid.{Response, SendGrid}
+import com.ruchij.services.verify.VerificationService
+import com.sendgrid.SendGrid
 import html.VerificationEmail
-import org.joda.time.DateTime
 import pureconfig.ConfigObjectSource
 
 object SendGridHandler {
 
-  def handle[F[_]: Sync: Either[Throwable, *] ~> *[_]: ContextShift: Clock](
-    blocker: Blocker,
+  def create[F[_]: Sync: ContextShift: Clock: Either[Throwable, *] ~> *[_]](
     configObjectSource: ConfigObjectSource,
-    jokeService: JokeService[F]
-  ): F[Response] =
+    blocker: Blocker
+  ): F[EmailService[F]#Response] =
     for {
       sendGridConfiguration <- SendGridConfiguration.load[F](configObjectSource)
+      verificationConfiguration <- VerificationConfiguration.load[F](configObjectSource)
 
-      sendGridService = new SendGridEmailService[F](new SendGrid(sendGridConfiguration.apiKey), blocker)
+      sendGridEmailService = new SendGridEmailService[F](new SendGrid(sendGridConfiguration.apiKey), blocker)
+      verificationService = new VerificationService[F](verificationConfiguration.messagePeriod)
+      jokeService = new JokeService[F](Faker.instance())
 
-      timestamp <- Clock[F].realTime(TimeUnit.MILLISECONDS)
+      result <- run(sendGridEmailService, verificationService, jokeService)(
+        sendGridConfiguration.destination,
+        sendGridConfiguration.sender
+      )
+    } yield result
 
+  def run[F[_]: Monad](
+    emailService: EmailService[F],
+    verificationService: VerificationService[F],
+    jokeService: JokeService[F]
+  )(destination: EmailAddress, sender: EmailAddress): F[emailService.Response] =
+    for {
       joke <- jokeService.joke
 
-      response <- sendGridService.send {
-        Email(
-          sendGridConfiguration.destination,
-          sendGridConfiguration.sender,
-          s"Verification Email at ${new DateTime(timestamp)}",
-          VerificationEmail(new DateTime(timestamp), joke).body
-        )
-      }
+      (timestamp, subject) <- verificationService.generateSubject
 
+      response <- emailService.send {
+        Email(destination, sender, subject, VerificationEmail(timestamp, joke).body)
+      }
     } yield response
 }

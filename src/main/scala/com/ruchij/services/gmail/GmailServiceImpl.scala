@@ -1,6 +1,6 @@
 package com.ruchij.services.gmail
 
-import java.io.{ByteArrayInputStream, InputStreamReader}
+import java.io.StringReader
 import java.util.{Base64, Collections}
 
 import cats.effect.{Blocker, ContextShift, Sync}
@@ -96,7 +96,7 @@ object GmailServiceImpl {
       clientSecrets <- Sync[F].delay {
         GoogleClientSecrets.load(
           jacksonFactory,
-          new InputStreamReader(new ByteArrayInputStream(StringContext.processEscapes(gmailConfiguration.credentials).getBytes))
+          new StringReader(StringContext.processEscapes(gmailConfiguration.credentials))
         )
       }
 

@@ -26,7 +26,7 @@ object Dependencies
 
   lazy val faker = "com.github.javafaker" % "javafaker" % "1.0.1"
 
-  lazy val fs2 = "co.fs2" %% "fs2-core" % "2.2.1"
+  lazy val fs2 = "co.fs2" %% "fs2-core" % "2.2.2"
 
   lazy val scalaTest = "org.scalatest" %% "scalatest" % "3.1.0"
 

@@ -1,8 +1,9 @@
 package com.ruchij.services.gmail
 
 import java.io.StringReader
-import java.util.{Base64, Collections}
+import java.util.Collections
 
+import cats.Applicative
 import cats.effect.{Blocker, ContextShift, Sync}
 import cats.implicits._
 import com.eed3si9n.ruchij.BuildInfo
@@ -15,7 +16,6 @@ import com.google.api.client.json.jackson2.JacksonFactory
 import com.google.api.client.util.store.MemoryDataStoreFactory
 import com.google.api.services.gmail.{Gmail, GmailScopes}
 import com.ruchij.config.GmailConfiguration
-import com.ruchij.services.email.models.Email
 import com.ruchij.services.email.models.Email.EmailAddress
 import com.ruchij.services.gmail.GmailServiceImpl.AUTHENTICATED_USER
 import com.ruchij.services.gmail.models.{GmailMessage, GmailMessagesResult}
@@ -53,32 +53,19 @@ class GmailServiceImpl[F[_]: Sync: ContextShift](gmail: Gmail, blocker: Blocker)
               .delay {
                 gmail.users().messages().get(AUTHENTICATED_USER, message.getId).execute()
               }
-              .map { message =>
-                val headers =
-                  message.getPayload.getHeaders.asScala.toList.foldLeft(Map.empty[String, String]) {
-                    case (values, header) => values + (header.getName -> header.getValue)
-                  }
-
-                for {
-                  from <- headers.get("From")
-                  to <- headers.get("To")
-                  subject <- headers.get("Subject")
-
-                  body = Option(message.getPayload.getBody.getData)
-                    .map { data =>
-                      new String(Base64.getDecoder.decode(data))
-                    }
-                    .getOrElse("")
-                } yield GmailMessage(message.getId, Email(Email.lift(to), Email.lift(from), subject, body), headers)
-              }
+              .flatMap(GmailMessage.parse[F])
           }
           .map { messages =>
-            GmailMessagesResult(
-              messages.collect { case Some(gmail: GmailMessage) => gmail },
-              Option(listMessagesResponse.getNextPageToken)
-            )
+            GmailMessagesResult(messages, Option(listMessagesResponse.getNextPageToken))
           }
       }
+
+  override def deleteMessage(messageId: String): F[Unit] =
+    blocker
+      .delay {
+        gmail.users().messages().trash(AUTHENTICATED_USER, messageId).execute()
+      }
+      .productR(Applicative[F].unit)
 }
 
 object GmailServiceImpl {

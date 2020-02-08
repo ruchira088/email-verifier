@@ -45,5 +45,7 @@ object GmailVerifierHandler {
         MonadError[F, Throwable]
           .raiseError(VerificationFailedException("Unable to find any messages to satisfy verification"))
       )(Applicative[F].pure)
+
+      _ <- gmailService.deleteMessage(successfulMessage.messageId)
     } yield successfulMessage
 }

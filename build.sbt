@@ -28,6 +28,10 @@ lazy val rootDependencies =
     shapeless,
     jodaTime,
     faker,
+    http4sDsl,
+    http4sBlazeClient,
+    http4sCirce,
+    circeGeneric,
     fs2
   )
 

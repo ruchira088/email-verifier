@@ -4,7 +4,7 @@ import com.ruchij.services.email.models.Email.EmailAddress
 import shapeless.tag.@@
 import shapeless.tag
 
-case class Email(to: EmailAddress, from: EmailAddress, subject: String, body: String)
+case class Email(to: EmailAddress, from: EmailAddress, subject: String, body: Option[String])
 
 object Email {
   trait EmailAddressTag

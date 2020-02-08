@@ -3,6 +3,7 @@ import sbt._
 object Dependencies
 {
   val SCALA_VERSION = "2.13.1"
+  val HTTP4S_VERSION = "0.21.0-RC4"
 
   lazy val kindProjector = "org.typelevel" %% "kind-projector" % "0.11.0" cross CrossVersion.full
 
@@ -25,6 +26,14 @@ object Dependencies
   lazy val jodaTime = "joda-time" % "joda-time" % "2.10.5"
 
   lazy val faker = "com.github.javafaker" % "javafaker" % "1.0.1"
+
+  lazy val http4sDsl = "org.http4s" %% "http4s-dsl" % HTTP4S_VERSION
+
+  lazy val http4sBlazeClient = "org.http4s" %% "http4s-blaze-client" % HTTP4S_VERSION
+
+  lazy val http4sCirce = "org.http4s" %% "http4s-circe" % HTTP4S_VERSION
+
+  lazy val circeGeneric = "io.circe" %% "circe-generic" % "0.13.0-RC1"
 
   lazy val fs2 = "co.fs2" %% "fs2-core" % "2.2.2"
 

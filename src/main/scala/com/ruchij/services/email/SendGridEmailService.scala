@@ -21,9 +21,10 @@ class SendGridEmailService[F[_]: Sync: ContextShift](sendGrid: SendGrid, blocker
               new SendGridEmail(email.from),
               email.subject,
               new SendGridEmail(email.to),
-              new Content(ContentType.TEXT_HTML.getMimeType, email.body)
-            )
-              .build()
+              email.body.fold(new Content()) { body =>
+                new Content(ContentType.TEXT_HTML.getMimeType, body)
+              }
+            ).build()
           }
         }
       }

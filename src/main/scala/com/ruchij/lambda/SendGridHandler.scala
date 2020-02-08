@@ -8,17 +8,19 @@ import com.ruchij.config.{SendGridConfiguration, VerificationConfiguration}
 import com.ruchij.services.email.models.Email
 import com.ruchij.services.email.models.Email.EmailAddress
 import com.ruchij.services.email.{EmailService, SendGridEmailService}
-import com.ruchij.services.joke.JokeService
+import com.ruchij.services.joke.{ChuckNorrisJokeService, JokeService, LocalJokeService}
 import com.ruchij.services.verify.VerificationService
 import com.sendgrid.SendGrid
 import html.VerificationEmail
+import org.http4s.client.Client
 import pureconfig.ConfigObjectSource
 
 object SendGridHandler {
 
   def create[F[_]: Sync: ContextShift: Clock: Either[Throwable, *] ~> *[_]](
     configObjectSource: ConfigObjectSource,
-    blocker: Blocker
+    blocker: Blocker,
+    client: Client[F]
   ): F[EmailService[F]#Response] =
     for {
       sendGridConfiguration <- SendGridConfiguration.load[F](configObjectSource)
@@ -26,9 +28,10 @@ object SendGridHandler {
 
       sendGridEmailService = new SendGridEmailService[F](new SendGrid(sendGridConfiguration.apiKey), blocker)
       verificationService = new VerificationService[F](verificationConfiguration.messagePeriod)
-      jokeService = new JokeService[F](Faker.instance())
 
-      result <- run(sendGridEmailService, verificationService, jokeService)(
+      chuckNorrisJokeService = new ChuckNorrisJokeService[F](client)
+
+      result <- run(sendGridEmailService, verificationService, chuckNorrisJokeService)(
         sendGridConfiguration.destination,
         sendGridConfiguration.sender
       )
@@ -45,7 +48,7 @@ object SendGridHandler {
       (timestamp, subject) <- verificationService.generateSubject
 
       response <- emailService.send {
-        Email(destination, sender, subject, VerificationEmail(timestamp, joke).body)
+        Email(destination, sender, subject, Some(VerificationEmail(timestamp, joke).body))
       }
     } yield response
 }

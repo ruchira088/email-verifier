@@ -9,11 +9,11 @@ object Dependencies
 
   lazy val betterMonadicFor = "com.olegpy" %% "better-monadic-for" % "0.3.1"
 
-  lazy val catsEffect = "org.typelevel" %% "cats-effect" % "2.1.0"
+  lazy val catsEffect = "org.typelevel" %% "cats-effect" % "2.1.1"
 
   lazy val pureConfig = "com.github.pureconfig" %% "pureconfig" % "0.12.2"
 
-  lazy val sendgrid = "com.sendgrid" % "sendgrid-java" % "4.4.1"
+  lazy val sendgrid = "com.sendgrid" % "sendgrid-java" % "4.4.4"
 
   lazy val googleApiClient = "com.google.api-client" % "google-api-client" % "1.23.0"
 
@@ -33,7 +33,7 @@ object Dependencies
 
   lazy val http4sCirce = "org.http4s" %% "http4s-circe" % HTTP4S_VERSION
 
-  lazy val circeGeneric = "io.circe" %% "circe-generic" % "0.13.0-RC1"
+  lazy val circeGeneric = "io.circe" %% "circe-generic" % "0.13.0"
 
   lazy val scalaTest = "org.scalatest" %% "scalatest" % "3.1.0"
 

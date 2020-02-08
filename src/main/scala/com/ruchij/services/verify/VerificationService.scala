@@ -2,12 +2,13 @@ package com.ruchij.services.verify
 
 import java.util.concurrent.TimeUnit
 
-import cats.{Applicative, MonadError}
+import cats.data.ReaderT
 import cats.effect.{Clock, Sync}
 import cats.implicits._
-import com.ruchij.config.VerificationConfiguration
+import cats.{Applicative, Monad, MonadError}
 import com.ruchij.services.email.EmailService
 import com.ruchij.services.email.models.Email
+import com.ruchij.services.email.models.Email.EmailAddress
 import com.ruchij.services.gmail.GmailService
 import com.ruchij.services.gmail.models.GmailMessage
 import com.ruchij.services.joke.JokeService
@@ -15,62 +16,73 @@ import com.ruchij.services.verify.exception.VerificationFailedException
 import com.ruchij.utils.MonadicUtils
 import html.{FailureNotificationEmail, VerificationEmail}
 import org.joda.time.DateTime
+import org.joda.time.format.DateTimeFormat
 
-class VerificationService[F[_]: Clock: Sync](
-  emailService: EmailService[F],
-  jokeService: JokeService[F],
-  gmailService: GmailService[F],
-  verificationConfiguration: VerificationConfiguration
-) {
+import scala.concurrent.duration.FiniteDuration
+
+object VerificationService {
   val SUBJECT_PREFIX = "Verification Email sent at "
 
-  val sendVerificationEmail: F[EmailService[F]#Response] =
-    for {
-      timestamp <- Clock[F].realTime(TimeUnit.MILLISECONDS)
-      joke <- jokeService.joke
+  def sendVerificationEmail[F[_]: Clock: Monad](
+    to: EmailAddress,
+    from: EmailAddress
+  ): ReaderT[F, (JokeService[F], EmailService[F]), EmailService[F]#Response] =
+    ReaderT {
+      case (jokeService, emailService) =>
+        for {
+          timestamp <- Clock[F].realTime(TimeUnit.MILLISECONDS)
+          joke <- jokeService.joke
 
-      response <- emailService.send {
-        Email(
-          verificationConfiguration.primaryEmail,
-          verificationConfiguration.sender,
-          SUBJECT_PREFIX + new DateTime(timestamp),
-          Some(VerificationEmail(new DateTime(timestamp), joke).body)
-        )
-      }
-    } yield response
-
-  val verify: F[GmailMessage] =
-    for {
-      emailMessages <- gmailService.fetchMessages(verificationConfiguration.sender, None)
-
-      result <- MonadicUtils.anyOf {
-        emailMessages.gmailMessages.map { gmailMessage =>
-          verifyEmail(gmailMessage.email).as(gmailMessage)
-        }
-      }
-
-      timestamp <- Clock[F].realTime(TimeUnit.MILLISECONDS)
-
-      successfulMessage <- result.fold[F[GmailMessage]](
-        notifyFailure(new DateTime(timestamp))
-          .productR {
-            MonadError[F, Throwable]
-              .raiseError(VerificationFailedException("Unable to find any messages to satisfy verification"))
+          response <- emailService.send {
+            Email(
+              to,
+              from,
+              SUBJECT_PREFIX + new DateTime(timestamp).toString(DateTimeFormat.mediumDateTime()),
+              Some(VerificationEmail(new DateTime(timestamp), joke).body)
+            )
           }
-      )(Applicative[F].pure)
+        } yield response
+    }
 
-      _ <- gmailService.deleteMessage(successfulMessage.messageId)
-    } yield successfulMessage
+  def verify[F[_]: Clock: Sync](
+    sender: EmailAddress,
+    period: FiniteDuration,
+    adminEmails: List[EmailAddress]
+  ): ReaderT[F, (GmailService[F], EmailService[F]), GmailMessage] =
+    ReaderT {
+      case (gmailService, emailService) =>
+        for {
+          emailMessages <- gmailService.fetchMessages(sender, None)
 
-  def verifyEmail(email: Email): F[DateTime] =
+          result <- MonadicUtils.anyOf {
+            emailMessages.gmailMessages.map { gmailMessage =>
+              verifyEmail(gmailMessage.email, period).as(gmailMessage)
+            }
+          }
+
+          timestamp <- Clock[F].realTime(TimeUnit.MILLISECONDS)
+
+          successfulMessage <- result.fold[F[GmailMessage]](
+            notifyFailure[F](new DateTime(timestamp), sender, adminEmails)
+              .run(emailService)
+              .productR {
+                MonadError[F, Throwable]
+                  .raiseError(VerificationFailedException("Unable to find any messages to satisfy verification"))
+              }
+          )(Applicative[F].pure)
+
+          _ <- gmailService.deleteMessage(successfulMessage.messageId)
+        } yield successfulMessage
+    }
+
+  def verifyEmail[F[_]: Sync: Clock](email: Email, period: FiniteDuration): F[DateTime] =
     if (email.subject.startsWith(SUBJECT_PREFIX))
       for {
-        sentDateTime <- Sync[F].delay { DateTime.parse(email.subject.substring(SUBJECT_PREFIX.length).trim) }
+        sentDateTime <- Sync[F].delay { DateTime.parse(email.subject.substring(SUBJECT_PREFIX.length).trim, DateTimeFormat.mediumDateTime()) }
 
         currentTimestamp <- Clock[F].realTime(TimeUnit.MILLISECONDS)
 
-        earliestAcceptedTimestamp = new DateTime(currentTimestamp)
-          .minus(verificationConfiguration.messagePeriod.toMillis)
+        earliestAcceptedTimestamp = new DateTime(currentTimestamp).minus(period.toMillis)
 
         _ <- if (earliestAcceptedTimestamp.isBefore(sentDateTime))
           Applicative[F].unit
@@ -84,17 +96,23 @@ class VerificationService[F[_]: Clock: Sync](
         VerificationFailedException(s"Email subject does NOT start with $SUBJECT_PREFIX")
       }
 
-  def notifyFailure(dateTime: DateTime): F[List[EmailService[F]#Response]] =
-    verificationConfiguration.adminEmails.traverse { emailAddress =>
-      emailService
-        .send {
-          Email(
-            emailAddress,
-            verificationConfiguration.sender,
-            s"Email verification failed at $dateTime",
-            Some(FailureNotificationEmail(dateTime).body)
-          )
-        }
-        .map(identity[EmailService[F]#Response])
+  def notifyFailure[F[_]: Applicative](
+    dateTime: DateTime,
+    sender: EmailAddress,
+    adminEmails: List[EmailAddress]
+  ): ReaderT[F, EmailService[F], List[EmailService[F]#Response]] =
+    ReaderT { emailService =>
+      adminEmails.traverse { emailAddress =>
+        emailService
+          .send {
+            Email(
+              emailAddress,
+              sender,
+              s"Email verification failed at $dateTime",
+              Some(FailureNotificationEmail(dateTime).body)
+            )
+          }
+          .map(identity[EmailService[F]#Response])
+      }
     }
 }

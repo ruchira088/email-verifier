@@ -3,9 +3,8 @@ package com.ruchij.lambda
 import cats.effect.{Blocker, Clock, ContextShift, Sync}
 import cats.implicits._
 import cats.~>
-import com.ruchij.config.{GmailConfiguration, SendGridConfiguration, VerificationConfiguration}
+import com.ruchij.config.{SendGridConfiguration, VerificationConfiguration}
 import com.ruchij.services.email.{EmailService, SendGridEmailService}
-import com.ruchij.services.gmail.GmailServiceImpl
 import com.ruchij.services.joke.ChuckNorrisJokeService
 import com.ruchij.services.verify.VerificationService
 import com.sendgrid.SendGrid
@@ -22,19 +21,12 @@ object SendGridHandler {
     for {
       sendGridConfiguration <- SendGridConfiguration.load[F](configObjectSource)
       verificationConfiguration <- VerificationConfiguration.load[F](configObjectSource)
-      gmailConfiguration <- GmailConfiguration.load[F](configObjectSource)
 
       sendGridEmailService = new SendGridEmailService[F](new SendGrid(sendGridConfiguration.apiKey), blocker)
-      gmailService <- GmailServiceImpl.create(gmailConfiguration, blocker)
       chuckNorrisJokeService = new ChuckNorrisJokeService[F](client)
 
-      verificationService = new VerificationService[F](
-        sendGridEmailService,
-        chuckNorrisJokeService,
-        gmailService,
-        verificationConfiguration
-      )
-
-      result <- verificationService.sendVerificationEmail
+      result <- VerificationService
+        .sendVerificationEmail(verificationConfiguration.primaryEmail, verificationConfiguration.sender)
+        .run((chuckNorrisJokeService, sendGridEmailService))
     } yield result
 }

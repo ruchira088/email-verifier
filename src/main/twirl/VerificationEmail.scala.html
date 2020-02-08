@@ -1,10 +1,15 @@
 @import org.joda.time.DateTime
+@import org.joda.time.format.DateTimeFormat
 
 @(timestamp: DateTime, description: String)
 
-<div>
-    Email sent at: <span id="timestamp">@timestamp</span> 😀
+<div class="header">
+    Email sent at: <span id="timestamp">@(timestamp.toString(DateTimeFormat.fullDateTime()))</span> 😀
 </div>
-<div class="description">
-    @description
+
+<div class="content">
+    <div class="joke">@description</div>
+    <div class="happy-image">
+        <img src="https://i.pinimg.com/originals/c8/e9/25/c8e92531123b667ff273344b9c9f5e1f.jpg" alt="happy image">
+    </div>
 </div>

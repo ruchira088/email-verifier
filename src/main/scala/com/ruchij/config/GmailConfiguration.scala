@@ -2,13 +2,11 @@ package com.ruchij.config
 
 import cats.effect.Sync
 import cats.~>
-import com.ruchij.services.email.models.Email.EmailAddress
-import com.ruchij.types.ConfigReaderTypes.emailConfigReader
 import pureconfig.ConfigObjectSource
 import pureconfig.error.ConfigReaderException
 import pureconfig.generic.auto._
 
-case class GmailConfiguration(refreshToken: String, credentials: String, sender: EmailAddress)
+case class GmailConfiguration(refreshToken: String, credentials: String)
 
 object GmailConfiguration {
 

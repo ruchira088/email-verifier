@@ -35,8 +35,6 @@ object Dependencies
 
   lazy val circeGeneric = "io.circe" %% "circe-generic" % "0.13.0-RC1"
 
-  lazy val fs2 = "co.fs2" %% "fs2-core" % "2.2.2"
-
   lazy val scalaTest = "org.scalatest" %% "scalatest" % "3.1.0"
 
   lazy val pegdown = "org.pegdown" % "pegdown" % "1.6.0"

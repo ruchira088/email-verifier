@@ -2,14 +2,15 @@ package com.ruchij.lambda
 
 import cats.effect.{Blocker, Clock, ContextShift, Sync}
 import cats.implicits._
-import cats.{Applicative, MonadError, ~>}
-import com.ruchij.config.{GmailConfiguration, VerificationConfiguration}
-import com.ruchij.services.email.models.Email.EmailAddress
+import cats.~>
+import com.github.javafaker.Faker
+import com.ruchij.config.{GmailConfiguration, SendGridConfiguration, VerificationConfiguration}
+import com.ruchij.services.email.SendGridEmailService
+import com.ruchij.services.gmail.GmailServiceImpl
 import com.ruchij.services.gmail.models.GmailMessage
-import com.ruchij.services.gmail.{GmailService, GmailServiceImpl}
+import com.ruchij.services.joke.LocalJokeService
 import com.ruchij.services.verify.VerificationService
-import com.ruchij.services.verify.exception.VerificationFailedException
-import com.ruchij.utils.MonadicUtils
+import com.sendgrid.SendGrid
 import pureconfig.ConfigObjectSource
 
 object GmailVerifierHandler {
@@ -21,31 +22,19 @@ object GmailVerifierHandler {
     for {
       verificationConfiguration <- VerificationConfiguration.load[F](configObjectSource)
       gmailConfiguration <- GmailConfiguration.load[F](configObjectSource)
+      sendGridConfiguration <- SendGridConfiguration.load[F](configObjectSource)
 
       gmailService <- GmailServiceImpl.create[F](gmailConfiguration, blocker)
-      verificationService = new VerificationService[F](verificationConfiguration.messagePeriod)
+      sendGridEmailService = new SendGridEmailService[F](new SendGrid(sendGridConfiguration.apiKey), blocker)
+      jokeService = new LocalJokeService[F](Faker.instance())
 
-      result <- run(gmailService, verificationService)(gmailConfiguration.sender)
+      verificationService = new VerificationService[F](
+        sendGridEmailService,
+        jokeService,
+        gmailService,
+        verificationConfiguration
+      )
+
+      result <- verificationService.verify
     } yield result
-
-  def run[F[_]: MonadError[*[_], Throwable]](
-    gmailService: GmailService[F],
-    verificationService: VerificationService[F]
-  )(sender: EmailAddress): F[GmailMessage] =
-    for {
-      emailMessages <- gmailService.fetchMessages(sender, None)
-
-      result <- MonadicUtils.anyOf {
-        emailMessages.gmailMessages.map { gmailMessage =>
-          verificationService.verify(gmailMessage.email).as(gmailMessage)
-        }
-      }
-
-      successfulMessage <- result.fold[F[GmailMessage]](
-        MonadError[F, Throwable]
-          .raiseError(VerificationFailedException("Unable to find any messages to satisfy verification"))
-      )(Applicative[F].pure)
-
-      _ <- gmailService.deleteMessage(successfulMessage.messageId)
-    } yield successfulMessage
 }

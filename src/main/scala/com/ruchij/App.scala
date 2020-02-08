@@ -7,7 +7,6 @@ import cats.implicits._
 import com.ruchij.lambda.{GmailVerifierHandler, SendGridHandler}
 import com.ruchij.types.FunctionKTypes.fromThrowableEither
 import com.ruchij.utils.MonadicUtils
-import fs2.Stream
 import org.http4s.client.blaze.BlazeClientBuilder
 import pureconfig.ConfigSource
 
@@ -27,21 +26,11 @@ object App extends IOApp {
             sendGridResult <- SendGridHandler.create[IO](configObjectSource, ioBlocker, client)
             _ <- IO.delay(println(sendGridResult))
 
-//            _ <-
-//              Stream.range[IO](100, 0, -5)
-//                .evalMap(count => IO.delay(println(s"$count seconds to go...")))
-//                .evalMap(_ => IO.sleep(5 second))
-//                .compile
-//                .drain
-//
-//            _ <- IO.delay(println("Waiting COMPLETED"))
-
-
             verificationResult <-
               MonadicUtils.retryWithDelay(
-                GmailVerifierHandler.create[IO] (configObjectSource, ioBlocker),
+                GmailVerifierHandler.create[IO](configObjectSource, ioBlocker),
                 5 seconds,
-                10
+                20
               )
 
             _ <- IO.delay(println(verificationResult))

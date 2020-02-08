@@ -31,8 +31,7 @@ lazy val rootDependencies =
     http4sDsl,
     http4sBlazeClient,
     http4sCirce,
-    circeGeneric,
-    fs2
+    circeGeneric
   )
 
 lazy val rootTestDependencies =

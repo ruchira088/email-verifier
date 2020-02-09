@@ -7,7 +7,19 @@ import com.ruchij.services.email.models.Email
 
 import scala.jdk.CollectionConverters.ListHasAsScala
 
-case class GmailMessage(messageId: String, email: Email, headers: Map[String, String])
+case class GmailMessage(messageId: String, email: Email, headers: Map[String, String]) {
+  override def toString: String =
+    s"""
+      |ID: $messageId
+      |$email
+      |Headers:
+      |${headers
+         .map {
+           case (key, value) => s"  $key -> ${if (value.length > 100) s"${value.substring(0, 100)}...." else value}"
+         }
+         .mkString("\n")}
+      |""".stripMargin
+}
 
 object GmailMessage {
   def parse[F[_]: Bracket[*[_], Throwable]](message: Message): F[GmailMessage] = {

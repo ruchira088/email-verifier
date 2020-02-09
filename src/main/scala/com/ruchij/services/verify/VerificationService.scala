@@ -108,7 +108,7 @@ object VerificationService {
             Email(
               emailAddress,
               sender,
-              s"Email verification failed at $dateTime",
+              s"Email verification failed at ${dateTime.toString(DateTimeFormat.mediumDateTime())}",
               Some(FailureNotificationEmail(dateTime).body)
             )
           }

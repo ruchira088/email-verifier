@@ -1,0 +1,24 @@
+---
+- hosts: localhost
+  connection: local
+
+  vars:
+    s3_bucket: email-verifier.ruchij.com
+
+  tasks:
+    - name: Create Terraform backend S3 bucket
+      aws_s3:
+        bucket: "{{ s3_bucket }}"
+        region: ap-southeast-2
+        mode: create
+
+    - name: Apply Terraform resources
+      terraform:
+        project_path: ./aws
+        force_init: yes
+        backend_config:
+          bucket: "{{ s3_bucket }}"
+          key: email-verifier.tfstate
+          region: ap-southeast-2
+        variables:
+          s3_bucket: "{{ s3_bucket }}"

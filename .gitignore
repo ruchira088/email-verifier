@@ -2,3 +2,4 @@
 target
 .DS_Store
 set-secrets.sh
+.terraform

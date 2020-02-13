@@ -12,6 +12,8 @@ import com.ruchij.services.email.models.Email.EmailAddress
 import com.ruchij.services.gmail.GmailService
 import com.ruchij.services.gmail.models.GmailMessage
 import com.ruchij.services.joke.JokeService
+import com.ruchij.services.slack.SlackNotificationService
+import com.ruchij.services.slack.models.SlackChannel
 import com.ruchij.services.verify.exception.VerificationFailedException
 import com.ruchij.utils.MonadicUtils
 import html.{FailureNotificationEmail, VerificationEmail}
@@ -26,21 +28,20 @@ object VerificationService {
   def sendVerificationEmail[F[_]: Clock: Monad](
     to: EmailAddress,
     from: EmailAddress
-  ): ReaderT[F, (JokeService[F], EmailService[F]), EmailService[F]#Response] =
+  ): ReaderT[F, (JokeService[F], EmailService[F], SlackNotificationService[F]), EmailService[F]#Response] =
     ReaderT {
-      case (jokeService, emailService) =>
+      case (jokeService, emailService, slackNotificationService) =>
         for {
           timestamp <- Clock[F].realTime(TimeUnit.MILLISECONDS)
           joke <- jokeService.joke
 
+          dateTime = new DateTime(timestamp).toString(DateTimeFormat.mediumDateTime())
+
           response <- emailService.send {
-            Email(
-              to,
-              from,
-              SUBJECT_PREFIX + new DateTime(timestamp).toString(DateTimeFormat.mediumDateTime()),
-              Some(VerificationEmail(new DateTime(timestamp), joke).body)
-            )
+            Email(to, from, SUBJECT_PREFIX + dateTime, Some(VerificationEmail(new DateTime(timestamp), joke).body))
           }
+
+          _ <- slackNotificationService.notify(SlackChannel.EmailVerifier, s"Sent verification email at $dateTime")
         } yield response
     }
 
@@ -48,9 +49,9 @@ object VerificationService {
     sender: EmailAddress,
     period: FiniteDuration,
     adminEmails: List[EmailAddress]
-  ): ReaderT[F, (GmailService[F], EmailService[F]), GmailMessage] =
+  ): ReaderT[F, (GmailService[F], EmailService[F], SlackNotificationService[F]), GmailMessage] =
     ReaderT {
-      case (gmailService, emailService) =>
+      case (gmailService, emailService, slackNotificationService) =>
         for {
           emailMessages <- gmailService.fetchMessages(sender, None)
 
@@ -64,12 +65,17 @@ object VerificationService {
 
           successfulMessage <- result.fold[F[GmailMessage]](
             notifyFailure[F](new DateTime(timestamp), sender, adminEmails)
-              .run(emailService)
+              .run((emailService, slackNotificationService))
               .productR {
                 MonadError[F, Throwable]
                   .raiseError(VerificationFailedException("Unable to find any messages to satisfy verification"))
               }
           )(Applicative[F].pure)
+
+          _ <- slackNotificationService.notify(
+            SlackChannel.EmailVerifier,
+            s"Verified email at ${new DateTime(timestamp).toString(DateTimeFormat.mediumDateTime())}"
+          )
 
           _ <- gmailService.deleteMessage(successfulMessage.messageId)
         } yield successfulMessage
@@ -78,7 +84,9 @@ object VerificationService {
   def verifyEmail[F[_]: Sync: Clock](email: Email, period: FiniteDuration): F[DateTime] =
     if (email.subject.startsWith(SUBJECT_PREFIX))
       for {
-        sentDateTime <- Sync[F].delay { DateTime.parse(email.subject.substring(SUBJECT_PREFIX.length).trim, DateTimeFormat.mediumDateTime()) }
+        sentDateTime <- Sync[F].delay {
+          DateTime.parse(email.subject.substring(SUBJECT_PREFIX.length).trim, DateTimeFormat.mediumDateTime())
+        }
 
         currentTimestamp <- Clock[F].realTime(TimeUnit.MILLISECONDS)
 
@@ -100,19 +108,27 @@ object VerificationService {
     dateTime: DateTime,
     sender: EmailAddress,
     adminEmails: List[EmailAddress]
-  ): ReaderT[F, EmailService[F], List[EmailService[F]#Response]] =
-    ReaderT { emailService =>
-      adminEmails.traverse { emailAddress =>
-        emailService
-          .send {
-            Email(
-              emailAddress,
-              sender,
-              s"Email verification failed at ${dateTime.toString(DateTimeFormat.mediumDateTime())}",
-              Some(FailureNotificationEmail(dateTime).body)
-            )
+  ): ReaderT[
+    F,
+    (EmailService[F], SlackNotificationService[F]),
+    (List[EmailService[F]#Response], SlackNotificationService[F]#Response)
+  ] =
+    ReaderT {
+      case (emailService, slackNotificationService) =>
+        val subject = s"Email verification failed at ${dateTime.toString(DateTimeFormat.mediumDateTime())}"
+
+        adminEmails
+          .traverse { emailAddress =>
+            emailService
+              .send {
+                Email(emailAddress, sender, subject, Some(FailureNotificationEmail(dateTime).body))
+              }
+              .map(identity[EmailService[F]#Response])
           }
-          .map(identity[EmailService[F]#Response])
-      }
+          .product {
+            slackNotificationService
+              .notify(SlackChannel.General, subject)
+              .map(identity[SlackNotificationService[F]#Response])
+          }
     }
 }

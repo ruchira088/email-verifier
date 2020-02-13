@@ -1,14 +1,12 @@
 package com.ruchij.services.verify
 
-import java.util.concurrent.ConcurrentHashMap
-
 import cats.effect.{Clock, IO}
 import com.github.javafaker.Faker
 import com.ruchij.services.email.models.Email
 import com.ruchij.services.gmail.models.GmailMessage
 import com.ruchij.services.joke.LocalJokeService
 import com.ruchij.services.verify.exception.VerificationFailedException
-import com.ruchij.stubs.{InMemoryEmailService, InMemoryGmailService}
+import com.ruchij.stubs.{InMemoryEmailService, InMemoryGmailService, InMemorySlackNotificationService}
 import com.ruchij.test.Providers
 import org.joda.time.DateTime
 import org.joda.time.format.DateTimeFormat
@@ -16,7 +14,6 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.{EitherValues, OptionValues}
 
-import scala.collection.mutable
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
@@ -27,12 +24,13 @@ class VerificationServiceTest extends AnyFlatSpec with Matchers with EitherValue
     implicit val clock: Clock[IO] = Providers.stubClock(dateTime)
 
     val jokeService = new LocalJokeService[IO](Faker.instance())
-    val emailService = new InMemoryEmailService[IO](mutable.Queue.empty)
+    val emailService = InMemoryEmailService[IO]
+    val slackNotificationService = InMemorySlackNotificationService[IO]
 
     val to = Email.lift("to@ruchij.com")
     val from = Email.lift("from@ruchij.com")
 
-    VerificationService.sendVerificationEmail[IO](to, from).run((jokeService, emailService)).unsafeRunSync()
+    VerificationService.sendVerificationEmail[IO](to, from).run((jokeService, emailService, slackNotificationService)).unsafeRunSync()
 
     emailService.emails must not be empty
 
@@ -51,14 +49,15 @@ class VerificationServiceTest extends AnyFlatSpec with Matchers with EitherValue
 
     val gmailMessage = createGmailMessage("gmail-1", dateTime)
 
-    val inMemoryGmailService = new InMemoryGmailService[IO](new ConcurrentHashMap())
+    val inMemoryGmailService = InMemoryGmailService[IO]
     inMemoryGmailService.putMessage(gmailMessage).unsafeRunSync()
 
-    val inMemoryEmailService = new InMemoryEmailService[IO](mutable.Queue.empty)
+    val inMemoryEmailService = InMemoryEmailService[IO]
+    val slackNotificationService = InMemorySlackNotificationService[IO]
 
     VerificationService
       .verify[IO](gmailMessage.email.from, 30 seconds, List.empty)
-      .run((inMemoryGmailService, inMemoryEmailService))
+      .run((inMemoryGmailService, inMemoryEmailService, slackNotificationService))
       .unsafeRunSync() mustBe gmailMessage
   }
 
@@ -72,14 +71,15 @@ class VerificationServiceTest extends AnyFlatSpec with Matchers with EitherValue
     val adminEmails = List(adminOne, adminTwo)
     val gmailMessage = createGmailMessage("gmail-1", dateTime.minusSeconds(60))
 
-    val inMemoryGmailService = new InMemoryGmailService[IO](new ConcurrentHashMap())
+    val inMemoryGmailService = InMemoryGmailService[IO]
     inMemoryGmailService.putMessage(gmailMessage).unsafeRunSync()
 
-    val inMemoryEmailService = new InMemoryEmailService[IO](mutable.Queue.empty)
+    val inMemoryEmailService = InMemoryEmailService[IO]
+    val slackNotificationService = InMemorySlackNotificationService[IO]
 
     VerificationService
       .verify[IO](gmailMessage.email.from, 30 seconds, adminEmails)
-      .run((inMemoryGmailService, inMemoryEmailService))
+      .run((inMemoryGmailService, inMemoryEmailService, slackNotificationService))
       .attempt
       .unsafeRunSync()
       .left

@@ -28,7 +28,7 @@ object App extends IOApp {
 
             verificationResult <-
               MonadicUtils.retryWithDelay(
-                GmailVerifierHandler.create[IO](configObjectSource, ioBlocker),
+                GmailVerifierHandler.create[IO](configObjectSource, ioBlocker, client),
                 5 seconds,
                 20
               )

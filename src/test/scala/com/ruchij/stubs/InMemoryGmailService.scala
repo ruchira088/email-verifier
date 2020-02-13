@@ -1,6 +1,6 @@
 package com.ruchij.stubs
 
-import java.util.concurrent.ConcurrentMap
+import java.util.concurrent.{ConcurrentHashMap, ConcurrentMap}
 
 import cats.Applicative
 import cats.effect.Sync
@@ -29,4 +29,9 @@ class InMemoryGmailService[F[_]: Sync](messages: ConcurrentMap[String, GmailMess
     Sync[F].delay {
       messages.put(gmailMessage.messageId, gmailMessage)
     }
+}
+
+object InMemoryGmailService {
+  def apply[F[_]: Sync]: InMemoryGmailService[F] =
+    new InMemoryGmailService[F](new ConcurrentHashMap())
 }

@@ -16,3 +16,7 @@ class InMemoryEmailService[F[_]: Sync](queue: mutable.Queue[Email]) extends Emai
 
   def emails: List[Email] = queue.toList
 }
+
+object InMemoryEmailService {
+  def apply[F[_]: Sync]: InMemoryEmailService[F] = new InMemoryEmailService[F](mutable.Queue.empty)
+}

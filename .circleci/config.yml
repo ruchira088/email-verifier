@@ -1,6 +1,6 @@
 version: 2
 jobs:
-  build:
+  build-and-test:
     docker:
       - image: openjdk:8-jdk
     steps:
@@ -36,3 +36,13 @@ jobs:
           paths:
             - ~/.sbt
             - ~/.coursier
+
+    create-terraform-resources:
+
+workflows:
+  version: 2
+
+  email-verifier:
+    jobs:
+      - build-and-test
+

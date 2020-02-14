@@ -35,6 +35,10 @@ object Dependencies
 
   lazy val circeGeneric = "io.circe" %% "circe-generic" % "0.13.0"
 
+  lazy val awsLambdaJavaEvents = "com.amazonaws" % "aws-lambda-java-events" % "2.2.7"
+
+  lazy val awsLambdaJavaCore = "com.amazonaws" % "aws-lambda-java-core" % "1.2.0"
+
   lazy val scalaTest = "org.scalatest" %% "scalatest" % "3.1.0"
 
   lazy val pegdown = "org.pegdown" % "pegdown" % "1.6.0"

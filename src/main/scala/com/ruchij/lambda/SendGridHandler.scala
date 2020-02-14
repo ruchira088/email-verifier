@@ -1,16 +1,39 @@
 package com.ruchij.lambda
 
-import cats.effect.{Blocker, Clock, ContextShift, Sync}
+import cats.effect.{Blocker, Clock, ContextShift, IO, Sync, Timer}
 import cats.implicits._
 import cats.~>
+import com.amazonaws.services.lambda.runtime.events.ScheduledEvent
+import com.amazonaws.services.lambda.runtime.{Context, RequestHandler}
 import com.ruchij.config.{SendGridConfiguration, SlackConfiguration, VerificationConfiguration}
 import com.ruchij.services.email.{EmailService, SendGridEmailService}
 import com.ruchij.services.joke.ChuckNorrisJokeService
 import com.ruchij.services.slack.SlackNotificationServiceImpl
 import com.ruchij.services.verify.VerificationService
+import com.ruchij.types.FunctionKTypes.fromThrowableEither
 import com.sendgrid.SendGrid
 import org.http4s.client.Client
-import pureconfig.ConfigObjectSource
+import org.http4s.client.blaze.BlazeClientBuilder
+import pureconfig.{ConfigObjectSource, ConfigSource}
+
+import scala.concurrent.ExecutionContext
+
+class SendGridHandler extends RequestHandler[ScheduledEvent, Unit] {
+
+  override def handleRequest(scheduledEvent: ScheduledEvent, context: Context): Unit = {
+    implicit val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
+    implicit val timer: Timer[IO] = IO.timer(ExecutionContext.global)
+
+    val blocker = Blocker.liftExecutionContext(ExecutionContext.global)
+    val configObjectSource = ConfigSource.defaultApplication
+
+    BlazeClientBuilder[IO](ExecutionContext.global).resource
+      .use { client =>
+        SendGridHandler.create[IO](configObjectSource, blocker, client)
+      }
+      .unsafeRunSync()
+  }
+}
 
 object SendGridHandler {
 

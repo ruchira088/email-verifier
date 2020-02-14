@@ -37,7 +37,9 @@ lazy val rootDependencies =
     http4sDsl,
     http4sBlazeClient,
     http4sCirce,
-    circeGeneric
+    circeGeneric,
+    awsLambdaJavaCore,
+    awsLambdaJavaEvents
   )
 
 lazy val rootTestDependencies =

@@ -12,8 +12,7 @@ import com.ruchij.services.slack.SlackNotificationServiceImpl
 import com.ruchij.services.verify.VerificationService
 import com.ruchij.types.FunctionKTypes.fromThrowableEither
 import com.sendgrid.SendGrid
-import org.http4s.client.Client
-import org.http4s.client.blaze.BlazeClientBuilder
+import org.http4s.client.{Client, JavaNetClientBuilder}
 import pureconfig.{ConfigObjectSource, ConfigSource}
 
 import scala.concurrent.ExecutionContext
@@ -26,11 +25,10 @@ class SendGridHandler extends RequestHandler[ScheduledEvent, Unit] {
 
     val blocker = Blocker.liftExecutionContext(ExecutionContext.global)
     val configObjectSource = ConfigSource.defaultApplication
+    val client = JavaNetClientBuilder[IO](blocker).create
 
-    BlazeClientBuilder[IO](ExecutionContext.global).resource
-      .use { client =>
-        SendGridHandler.create[IO](configObjectSource, blocker, client)
-      }
+    SendGridHandler
+      .create[IO](configObjectSource, blocker, client)
       .unsafeRunSync()
   }
 }

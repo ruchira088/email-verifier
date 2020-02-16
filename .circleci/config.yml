@@ -1,24 +1,55 @@
-version: 2
+version: 2.1
+
+alias:
+  - &install-sbt
+    name: Install sbt
+    command: |
+      apt-get update && \
+      apt-get install apt-transport-https bc ca-certificates software-properties-common -y
+
+      echo "deb https://dl.bintray.com/sbt/debian /" | tee -a /etc/apt/sources.list.d/sbt.list && \
+      apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv 2EE0EA64E40A89B84B2DF73499E82A75642AC823 && \
+      apt-get update && \
+      apt-get install sbt -y
+
+  - &install-git
+    name: Install Git and CA-certificates
+    command: |
+      apt update && \
+      apt install git apt-transport-https bc ca-certificates software-properties-common -y
+
+  - &install-ansible
+    name: Install Ansible
+    command: |
+      apt update && \
+      apt install software-properties-common python-pip -y
+
+      pip install ansible boto3 botocore
+
+  - &install-terraform
+    name: Install Terraform
+    command: |
+      apt update && \
+      apt install unzip curl -y
+
+      curl -L -o /tmp/terraform.zip https://releases.hashicorp.com/terraform/$TERRAFORM_VERSION/terraform_"${TERRAFORM_VERSION}"_linux_amd64.zip && \
+      unzip -d /tmp /tmp/terraform.zip && \
+      chmod +x /tmp/terraform && \
+      mv /tmp/terraform /usr/local/bin
+    environment:
+      TERRAFORM_VERSION: 0.12.20
+
 jobs:
   build-and-test:
     docker:
       - image: openjdk:8-jdk
     steps:
-      - run:
-          name: Install sbt
-          command: |
-            apt-get update && \
-            apt-get install apt-transport-https bc ca-certificates software-properties-common -y
-
-            echo "deb https://dl.bintray.com/sbt/debian /" | tee -a /etc/apt/sources.list.d/sbt.list && \
-            apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv 2EE0EA64E40A89B84B2DF73499E82A75642AC823 && \
-            apt-get update && \
-            apt-get install sbt -y
+      - run: *install-git
+      - run: *install-sbt
       - checkout
       - restore_cache:
           keys:
             - sbt-cache-{{ checksum "project/build.properties" }}-{{ checksum "project/plugins.sbt" }}-{{ checksum "project/Dependencies.scala" }}
-            - sbt-cache
       - run:
           name: Fetch compile dependencies
           command: sbt update
@@ -31,13 +62,45 @@ jobs:
       - run:
           name: Run unit tests
           command: sbt test
+      - run:
+          name: Build fat JAR
+          command: sbt assembly
+      - persist_to_workspace:
+          root: .
+          paths:
+            - target/scala-2.13/email-verifier.jar
       - save_cache:
           key: sbt-cache-{{ checksum "project/build.properties" }}-{{ checksum "project/plugins.sbt" }}-{{ checksum "project/Dependencies.scala" }}
           paths:
             - ~/.sbt
             - ~/.coursier
 
-    create-terraform-resources:
+  create-terraform-resources:
+    docker:
+      - image: ubuntu:18.04
+    steps:
+      - run: *install-git
+      - run: *install-ansible
+      - run: *install-terraform
+      - checkout
+      - run:
+          name: Run Ansible Playbook to create Terraform resources
+          command: ansible-playbook deploy/aws.yml
+
+  deploy:
+    docker:
+      - image: node:lts
+    steps:
+      - run: *install-git
+      - run:
+          name: Install Serverless
+          command: npm install serverless -g
+      - checkout
+      - attach_workspace:
+          at: .
+      - run:
+          name: Deploy application
+          command: serverless deploy -v
 
 workflows:
   version: 2
@@ -45,4 +108,13 @@ workflows:
   email-verifier:
     jobs:
       - build-and-test
+      - create-terraform-resources:
+          context: aws-credentials
+
+      - deploy:
+          context: aws-credentials
+          requires:
+            - build-and-test
+            - create-terraform-resources
+
 

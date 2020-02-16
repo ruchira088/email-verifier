@@ -17,9 +17,9 @@ import scala.concurrent.duration._
 
 object App extends IOApp {
 
-  override def run(args: List[String]): IO[ExitCode] = unsafeProgram
+  override def run(args: List[String]): IO[ExitCode] = lambdaHandlers
 
-  val unsafeProgram: IO[ExitCode] =
+  val lambdaHandlers: IO[ExitCode] =
     for {
       gmailVerifierHandler <- IO.pure(new GmailVerifierHandler)
       sendGridHandler = new SendGridHandler

@@ -17,7 +17,7 @@ import com.ruchij.services.slack.models.SlackChannel
 import com.ruchij.services.verify.exception.VerificationFailedException
 import com.ruchij.utils.MonadicUtils
 import html.{FailureNotificationEmail, VerificationEmail}
-import org.joda.time.DateTime
+import org.joda.time.{DateTime, DateTimeZone}
 import org.joda.time.format.DateTimeFormat
 
 import scala.concurrent.duration.FiniteDuration
@@ -27,7 +27,8 @@ object VerificationService {
 
   def sendVerificationEmail[F[_]: Clock: Monad](
     to: EmailAddress,
-    from: EmailAddress
+    from: EmailAddress,
+    timeZone: DateTimeZone
   ): ReaderT[F, (JokeService[F], EmailService[F], SlackNotificationService[F]), EmailService[F]#Response] =
     ReaderT {
       case (jokeService, emailService, slackNotificationService) =>
@@ -35,10 +36,15 @@ object VerificationService {
           timestamp <- Clock[F].realTime(TimeUnit.MILLISECONDS)
           joke <- jokeService.joke
 
-          dateTime = new DateTime(timestamp).toString(DateTimeFormat.mediumDateTime())
+          dateTime = new DateTime(timestamp).withZone(timeZone).toString(DateTimeFormat.mediumDateTime())
 
           response <- emailService.send {
-            Email(to, from, SUBJECT_PREFIX + dateTime, Some(VerificationEmail(new DateTime(timestamp), joke).body))
+            Email(
+              to,
+              from,
+              SUBJECT_PREFIX + dateTime,
+              Some(VerificationEmail(new DateTime(timestamp).withZone(timeZone), joke).body)
+            )
           }
 
           _ <- slackNotificationService.notify(SlackChannel.EmailVerifier, s"Sent verification email at $dateTime")
@@ -48,7 +54,8 @@ object VerificationService {
   def verify[F[_]: Clock: Sync](
     sender: EmailAddress,
     period: FiniteDuration,
-    adminEmails: List[EmailAddress]
+    adminEmails: List[EmailAddress],
+    timeZone: DateTimeZone
   ): ReaderT[F, (GmailService[F], EmailService[F], SlackNotificationService[F]), GmailMessage] =
     ReaderT {
       case (gmailService, emailService, slackNotificationService) =>
@@ -57,14 +64,14 @@ object VerificationService {
 
           result <- MonadicUtils.anyOf {
             emailMessages.gmailMessages.map { gmailMessage =>
-              verifyEmail(gmailMessage.email, period).as(gmailMessage)
+              verifyEmail(gmailMessage.email, period, timeZone).as(gmailMessage)
             }
           }
 
           timestamp <- Clock[F].realTime(TimeUnit.MILLISECONDS)
 
           successfulMessage <- result.fold[F[GmailMessage]](
-            notifyFailure[F](new DateTime(timestamp), sender, adminEmails)
+            notifyFailure[F](new DateTime(timestamp), sender, adminEmails, timeZone)
               .run((emailService, slackNotificationService))
               .productR {
                 MonadError[F, Throwable]
@@ -74,23 +81,26 @@ object VerificationService {
 
           _ <- slackNotificationService.notify(
             SlackChannel.EmailVerifier,
-            s"Verified email at ${new DateTime(timestamp).toString(DateTimeFormat.mediumDateTime())}"
+            s"Verified email at ${new DateTime(timestamp).withZone(timeZone).toString(DateTimeFormat.mediumDateTime())}"
           )
 
           _ <- gmailService.deleteMessage(successfulMessage.messageId)
         } yield successfulMessage
     }
 
-  def verifyEmail[F[_]: Sync: Clock](email: Email, period: FiniteDuration): F[DateTime] =
+  def verifyEmail[F[_]: Sync: Clock](email: Email, period: FiniteDuration, timeZone: DateTimeZone): F[DateTime] =
     if (email.subject.startsWith(SUBJECT_PREFIX))
       for {
         sentDateTime <- Sync[F].delay {
-          DateTime.parse(email.subject.substring(SUBJECT_PREFIX.length).trim, DateTimeFormat.mediumDateTime())
+          DateTime.parse(
+            email.subject.substring(SUBJECT_PREFIX.length).trim,
+            DateTimeFormat.mediumDateTime().withZone(timeZone)
+          )
         }
 
         currentTimestamp <- Clock[F].realTime(TimeUnit.MILLISECONDS)
 
-        earliestAcceptedTimestamp = new DateTime(currentTimestamp).minus(period.toMillis)
+        earliestAcceptedTimestamp = new DateTime(currentTimestamp).minus(period.toMillis).withZone(timeZone)
 
         _ <- if (earliestAcceptedTimestamp.isBefore(sentDateTime))
           Applicative[F].unit
@@ -107,7 +117,8 @@ object VerificationService {
   def notifyFailure[F[_]: Applicative](
     dateTime: DateTime,
     sender: EmailAddress,
-    adminEmails: List[EmailAddress]
+    adminEmails: List[EmailAddress],
+    timeZone: DateTimeZone
   ): ReaderT[
     F,
     (EmailService[F], SlackNotificationService[F]),
@@ -115,7 +126,7 @@ object VerificationService {
   ] =
     ReaderT {
       case (emailService, slackNotificationService) =>
-        val subject = s"Email verification failed at ${dateTime.toString(DateTimeFormat.mediumDateTime())}"
+        val subject = s"Email verification failed at ${dateTime.withZone(timeZone).toString(DateTimeFormat.mediumDateTime())}"
 
         adminEmails
           .traverse { emailAddress =>

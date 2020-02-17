@@ -40,7 +40,7 @@ object GmailVerifierHandler {
     httpClient: Client[F]
   ): F[GmailMessage] =
     for {
-      VerificationConfiguration(messagePeriod, _, adminEmails, sender) <- VerificationConfiguration.load[F](
+      VerificationConfiguration(messagePeriod, _, adminEmails, sender, timeZone) <- VerificationConfiguration.load[F](
         configObjectSource
       )
 
@@ -53,7 +53,7 @@ object GmailVerifierHandler {
       slackNotificationService = new SlackNotificationServiceImpl[F](httpClient, slackConfiguration)
 
       result <- VerificationService
-        .verify(sender, messagePeriod, adminEmails)
+        .verify(sender, messagePeriod, adminEmails, timeZone)
         .run((gmailService, sendGridEmailService, slackNotificationService))
     } yield result
 }

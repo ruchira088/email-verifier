@@ -10,14 +10,18 @@ import com.ruchij.lambda.{GmailVerifierHandler, SendGridHandler}
 import com.ruchij.types.FunctionKTypes.fromThrowableEither
 import com.ruchij.utils.MonadicUtils
 import org.http4s.client.blaze.BlazeClientBuilder
+import org.joda.time.DateTimeZone
 import pureconfig.ConfigSource
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
+import scala.jdk.CollectionConverters._
 
 object App extends IOApp {
 
-  override def run(args: List[String]): IO[ExitCode] = lambdaHandlers
+  override def run(args: List[String]): IO[ExitCode] =
+    IO.delay(println(DateTimeZone.getAvailableIDs.asScala))
+    .as(ExitCode.Success)
 
   val lambdaHandlers: IO[ExitCode] =
     for {

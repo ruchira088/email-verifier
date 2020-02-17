@@ -3,7 +3,8 @@ package com.ruchij.config
 import cats.effect.Sync
 import cats.~>
 import com.ruchij.services.email.models.Email.EmailAddress
-import com.ruchij.types.ConfigReaderTypes.emailConfigReader
+import com.ruchij.types.ConfigReaderTypes.{dateTimeZoneConfigReader, emailConfigReader}
+import org.joda.time.DateTimeZone
 import pureconfig.ConfigObjectSource
 import pureconfig.error.ConfigReaderException
 import pureconfig.generic.auto._
@@ -14,7 +15,8 @@ case class VerificationConfiguration(
   messagePeriod: FiniteDuration,
   primaryEmail: EmailAddress,
   adminEmails: List[EmailAddress],
-  sender: EmailAddress
+  sender: EmailAddress,
+  timeZone: DateTimeZone
 )
 
 object VerificationConfiguration {

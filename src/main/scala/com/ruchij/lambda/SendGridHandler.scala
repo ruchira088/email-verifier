@@ -42,7 +42,7 @@ object SendGridHandler {
   ): F[EmailService[F]#Response] =
     for {
       sendGridConfiguration <- SendGridConfiguration.load[F](configObjectSource)
-      verificationConfiguration <- VerificationConfiguration.load[F](configObjectSource)
+      VerificationConfiguration(_, primaryEmail, _, sender, timeZone) <- VerificationConfiguration.load[F](configObjectSource)
       slackConfiguration <- SlackConfiguration.load[F](configObjectSource)
 
       sendGridEmailService = new SendGridEmailService[F](new SendGrid(sendGridConfiguration.apiKey), blocker)
@@ -50,7 +50,7 @@ object SendGridHandler {
       slackNotificationService = new SlackNotificationServiceImpl[F](client, slackConfiguration)
 
       result <- VerificationService
-        .sendVerificationEmail(verificationConfiguration.primaryEmail, verificationConfiguration.sender)
+        .sendVerificationEmail(primaryEmail, sender, timeZone)
         .run((chuckNorrisJokeService, sendGridEmailService, slackNotificationService))
     } yield result
 }

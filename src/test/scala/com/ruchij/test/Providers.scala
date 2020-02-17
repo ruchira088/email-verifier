@@ -2,12 +2,13 @@ package com.ruchij.test
 
 import java.util.concurrent.TimeUnit
 
-import cats.{Applicative, Functor}
 import cats.effect.{Clock, Sync}
-import cats.implicits._
+import cats.implicits.{toFlatMapOps, toFunctorOps}
+import cats.{Applicative, Functor}
 import org.joda.time.DateTime
 
 import scala.concurrent.duration.TimeUnit
+import scala.util.Random
 
 object Providers {
 
@@ -28,4 +29,8 @@ object Providers {
 
       override def monotonic(unit: TimeUnit): F[Long] = realTime(unit)
     }
+
+  def randomPick[F[_]: Sync, A](values: Seq[A]): F[A] =
+    Sync[F].delay(Random.nextInt(values.length))
+      .flatMap(index => Sync[F].delay(values(index)))
 }

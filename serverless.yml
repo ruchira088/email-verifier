@@ -21,9 +21,9 @@ functions:
   sendVerificationEmail:
     handler: com.ruchij.lambda.SendGridHandler
     events:
-      - schedule: cron(0 * * * ? *)
+      - schedule: cron(0 0/4 * * ? *)
 
   verifySentEmail:
     handler: com.ruchij.lambda.GmailVerifierHandler
     events:
-      - schedule: cron(2 * * * ? *)
+      - schedule: cron(2 0/4 * * ? *)
